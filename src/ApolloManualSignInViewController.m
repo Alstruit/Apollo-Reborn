@@ -106,11 +106,26 @@ static NSString *ARExtractParam(NSString *urlString, NSString *name);
                                              selector:@selector(_keyboardWillChangeFrame:)
                                                  name:UIKeyboardWillChangeFrameNotification
                                                object:nil];
+
+    // Tap anywhere outside the text view to dismiss the keyboard. UIKit has no
+    // built-in tap-away resign, so wire it explicitly. cancelsTouchesInView=NO
+    // lets the tap fall through to whatever was hit — so tapping a button while
+    // the keyboard is up both dismisses it AND fires the button in one tap,
+    // instead of the stock "first tap eats, second tap acts" annoyance.
+    UITapGestureRecognizer *tapAway =
+        [[UITapGestureRecognizer alloc] initWithTarget:self
+                                                action:@selector(_dismissKeyboard)];
+    tapAway.cancelsTouchesInView = NO;
+    [self.view addGestureRecognizer:tapAway];
 }
 
 #pragma mark - Actions
 
 #pragma mark - Keyboard avoidance
+
+- (void)_dismissKeyboard {
+    [self.view endEditing:NO];
+}
 
 - (void)_keyboardWillChangeFrame:(NSNotification *)note {
     NSDictionary *info = note.userInfo;
