@@ -15,6 +15,7 @@ static NSString *ARExtractParam(NSString *urlString, NSString *name);
 @property (nonatomic, copy) NSString *callbackScheme;
 @property (nonatomic, copy) void (^onComplete)(NSURL *callbackURL);
 @property (nonatomic, strong) UITextView *codeTextView;
+@property (nonatomic, strong) UIScrollView *scrollView;
 @end
 
 @implementation ApolloManualSignInViewController
@@ -40,6 +41,7 @@ static NSString *ARExtractParam(NSString *urlString, NSString *name);
     scroll.translatesAutoresizingMaskIntoConstraints = NO;
     scroll.keyboardDismissMode = UIScrollViewKeyboardDismissModeInteractive;
     [self.view addSubview:scroll];
+    self.scrollView = scroll;
 
     UIStackView *stack = [UIStackView new];
     stack.axis = UILayoutConstraintAxisVertical;
@@ -99,9 +101,48 @@ static NSString *ARExtractParam(NSString *urlString, NSString *name);
     [stack addArrangedSubview:[self _button:@"Paste from Clipboard" filled:NO action:@selector(_pasteFromClipboard:)]];
     [stack addArrangedSubview:[self _spacer:6]];
     [stack addArrangedSubview:[self _button:@"Complete Sign-In" filled:YES action:@selector(_completeTapped:)]];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(_keyboardWillChangeFrame:)
+                                                 name:UIKeyboardWillChangeFrameNotification
+                                               object:nil];
 }
 
 #pragma mark - Actions
+
+#pragma mark - Keyboard avoidance
+
+- (void)_keyboardWillChangeFrame:(NSNotification *)note {
+    NSDictionary *info = note.userInfo;
+    CGRect endFrame = [info[UIKeyboardFrameEndUserInfoKey] CGRectValue];
+    // Convert from screen to view coordinates; on hide the end frame sits
+    // below the screen, so the overlap naturally computes to 0.
+    CGRect endInView = [self.view convertRect:endFrame fromView:nil];
+    CGFloat overlap = MAX(0, CGRectGetMaxY(self.view.bounds) - CGRectGetMinY(endInView));
+    // The scroll view already absorbs the bottom safe area through its
+    // adjusted content inset; only add the keyboard height above it.
+    CGFloat bottomInset = MAX(0, overlap - self.view.safeAreaInsets.bottom);
+
+    NSTimeInterval duration = [info[UIKeyboardAnimationDurationUserInfoKey] doubleValue];
+    UIViewAnimationOptions curve =
+        (UIViewAnimationOptions)([info[UIKeyboardAnimationCurveUserInfoKey] unsignedIntegerValue] << 16);
+
+    [UIView animateWithDuration:duration
+                          delay:0
+                        options:curve | UIViewAnimationOptionBeginFromCurrentState
+                     animations:^{
+        UIEdgeInsets inset = self.scrollView.contentInset;
+        inset.bottom = bottomInset;
+        self.scrollView.contentInset = inset;
+        self.scrollView.verticalScrollIndicatorInsets = inset;
+    } completion:^(BOOL finished) {
+        if (bottomInset > 0 && self.codeTextView.isFirstResponder) {
+            CGRect target = [self.scrollView convertRect:self.codeTextView.bounds
+                                                fromView:self.codeTextView];
+            [self.scrollView scrollRectToVisible:CGRectInset(target, 0, -12) animated:YES];
+        }
+    }];
+}
 
 - (void)_copyUserscriptLink:(UIButton *)sender {
     [UIPasteboard generalPasteboard].string = kApolloUserscriptURL;
@@ -294,6 +335,10 @@ static NSString *ARExtractParam(NSString *urlString, NSString *name) {
                                                            preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 @end
