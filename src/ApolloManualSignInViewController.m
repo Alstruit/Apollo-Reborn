@@ -238,30 +238,63 @@ static NSString *ARExtractParam(NSString *urlString, NSString *name) {
 }
 
 - (UIButton *)_button:(NSString *)title filled:(BOOL)filled action:(SEL)action {
-    UIButtonConfiguration *cfg = filled
-        ? [UIButtonConfiguration filledButtonConfiguration]
-        : [UIButtonConfiguration tintedButtonConfiguration];
-    cfg.title = title;
-    cfg.cornerStyle = UIButtonConfigurationCornerStyleLarge;
-    cfg.contentInsets = NSDirectionalEdgeInsetsMake(12, 16, 12, 16);
-
     UIButton *b = [UIButton buttonWithType:UIButtonTypeSystem];
-    b.configuration = cfg;
+    
+    // UIButtonConfiguration is iOS 15+. Apollo Reborn still loads on iOS 14
+    // (jailbreak), so fall back to manual styling there.
+    if (@available(iOS 15.0, *)) {
+        UIButtonConfiguration *cfg = filled
+            ? [UIButtonConfiguration filledButtonConfiguration]
+            : [UIButtonConfiguration tintedButtonConfiguration];
+        cfg.title = title;
+        cfg.cornerStyle = UIButtonConfigurationCornerStyleLarge;
+        cfg.contentInsets = NSDirectionalEdgeInsetsMake(12, 16, 12, 16);
+        b.configuration = cfg;
+    } else {
+        [b setTitle:title forState:UIControlStateNormal];
+        b.titleLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        b.contentEdgeInsets = UIEdgeInsetsMake(12, 16, 12, 16); // iOS 14 fallback; ignored under UIButtonConfiguration
+#pragma clang diagnostic pop
+        b.layer.cornerRadius = 12;
+        b.clipsToBounds = YES;
+        UIColor *tint = self.view.tintColor ?: [UIColor systemBlueColor];
+        if (filled) {
+            b.backgroundColor = tint;
+            [b setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        } else {
+            b.backgroundColor = [tint colorWithAlphaComponent:0.15];
+            [b setTitleColor:tint forState:UIControlStateNormal];
+        }
+    }
+
     [b addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
     return b;
 }
 
 - (void)_flashButton:(UIButton *)button title:(NSString *)title {
-    UIButtonConfiguration *cfg = button.configuration;
-    NSString *original = cfg.title;
-    cfg.title = title;
-    button.configuration = cfg;
+    NSString *original;
+    if (@available(iOS 15.0, *)) {
+        original = button.configuration.title;
+    } else {
+        original = [button titleForState:UIControlStateNormal];
+    }
+    [self _setButton:button title:title];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.3 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-        UIButtonConfiguration *c = button.configuration;
-        c.title = original;
-        button.configuration = c;
+        [self _setButton:button title:original];
     });
+}
+
+- (void)_setButton:(UIButton *)button title:(NSString *)title {
+    if (@available(iOS 15.0, *)) {
+        UIButtonConfiguration *cfg = button.configuration;
+        cfg.title = title;
+        button.configuration = cfg;
+    } else {
+        [button setTitle:title forState:UIControlStateNormal];
+    }
 }
 
 - (void)_alert:(NSString *)title message:(NSString *)message {

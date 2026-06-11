@@ -108,7 +108,7 @@
     }];
     if (onOldReddit) oldReddit.attributes = UIMenuElementAttributesDisabled;
 
-    UIAction *manual = [UIAction actionWithTitle:@"Manual Sign-In (Reynard)…"
+    UIAction *manual = [UIAction actionWithTitle:@"Manual Sign-In (Reynard)"
                                            image:[UIImage systemImageNamed:@"doc.on.clipboard"]
                                       identifier:nil
                                          handler:^(__kindof UIAction *action) {
