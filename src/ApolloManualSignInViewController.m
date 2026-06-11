@@ -238,30 +238,54 @@ static NSString *ARExtractParam(NSString *urlString, NSString *name) {
 }
 
 - (UIButton *)_button:(NSString *)title filled:(BOOL)filled action:(SEL)action {
-    UIButtonConfiguration *cfg = filled
-        ? [UIButtonConfiguration filledButtonConfiguration]
-        : [UIButtonConfiguration tintedButtonConfiguration];
-    cfg.title = title;
-    cfg.cornerStyle = UIButtonConfigurationCornerStyleLarge;
-    cfg.contentInsets = NSDirectionalEdgeInsetsMake(12, 16, 12, 16);
-
     UIButton *b = [UIButton buttonWithType:UIButtonTypeSystem];
-    b.configuration = cfg;
+    if (@available(iOS 15.0, *)) {
+        UIButtonConfiguration *cfg = filled
+            ? [UIButtonConfiguration filledButtonConfiguration]
+            : [UIButtonConfiguration tintedButtonConfiguration];
+        cfg.title = title;
+        cfg.cornerStyle = UIButtonConfigurationCornerStyleLarge;
+        cfg.contentInsets = NSDirectionalEdgeInsetsMake(12, 16, 12, 16);
+        b.configuration = cfg;
+    } else {
+        // iOS 14: UIButtonConfiguration doesn't exist — style manually.
+        [b setTitle:title forState:UIControlStateNormal];
+        b.titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+        b.contentEdgeInsets = UIEdgeInsetsMake(12, 16, 12, 16);
+        b.layer.cornerRadius = 12;
+        b.clipsToBounds = YES;
+        if (filled) {
+            b.backgroundColor = self.view.tintColor;
+            [b setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        } else {
+            b.backgroundColor = [self.view.tintColor colorWithAlphaComponent:0.15];
+            [b setTitleColor:self.view.tintColor forState:UIControlStateNormal];
+        }
+    }
     [b addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
     return b;
 }
 
 - (void)_flashButton:(UIButton *)button title:(NSString *)title {
-    UIButtonConfiguration *cfg = button.configuration;
-    NSString *original = cfg.title;
-    cfg.title = title;
-    button.configuration = cfg;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.3 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-        UIButtonConfiguration *c = button.configuration;
-        c.title = original;
-        button.configuration = c;
-    });
+    if (@available(iOS 15.0, *)) {
+        UIButtonConfiguration *cfg = button.configuration;
+        NSString *original = cfg.title;
+        cfg.title = title;
+        button.configuration = cfg;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.3 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            UIButtonConfiguration *c = button.configuration;
+            c.title = original;
+            button.configuration = c;
+        });
+    } else {
+        NSString *original = [button titleForState:UIControlStateNormal];
+        [button setTitle:title forState:UIControlStateNormal];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.3 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            [button setTitle:original forState:UIControlStateNormal];
+        });
+    }
 }
 
 - (void)_alert:(NSString *)title message:(NSString *)message {
